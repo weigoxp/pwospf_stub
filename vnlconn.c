@@ -4,7 +4,6 @@
 #include <signal.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
-/* 90904102 */
 
 struct VnlConn* vnl_open(uint16_t topoid, const char* host) {
 	char connscript[32];

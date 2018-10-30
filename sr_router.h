@@ -3,7 +3,7 @@
  * Date: ?
  * Authors: Guido Apenzeller, Martin Casado, Virkam V.
  * Contact: casado@stanford.edu
- * 90904102 
+ *
  *---------------------------------------------------------------------------*/
 
 #ifndef SR_ROUTER_H
@@ -36,6 +36,8 @@
 struct sr_if;
 struct sr_rt;
 
+struct pwospf_subsys;
+
 /* ----------------------------------------------------------------------------
  * struct sr_instance
  *
@@ -58,6 +60,10 @@ struct sr_instance
     struct sr_if* if_list; /* list of interfaces */
     struct sr_rt* routing_table; /* routing table */
     FILE* logfile;
+    volatile uint8_t  hw_init; /* bool : hardware has been initialized */
+
+    /* -- pwospf subsystem -- */
+    struct pwospf_subsys* ospf_subsys;
 };
 
 /* -- sr_main.c -- */

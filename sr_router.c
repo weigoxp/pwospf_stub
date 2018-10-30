@@ -21,6 +21,7 @@
 #include "sr_protocol.h"
 #include "sr_packethandler.h"
 #include "arp_cache.h"
+#include "sr_pwospf.h"
 
 /*--------------------------------------------------------------------- 
  * Method: sr_init(void)

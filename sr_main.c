@@ -33,6 +33,8 @@
 #include "sr_dumper.h"
 #include "sr_router.h"
 #include "sr_rt.h"
+#include "sr_pwospf.h"
+#include "sr_if.h"
 
 extern char* optarg;
 
@@ -281,7 +283,7 @@ int sr_verify_routing_table(struct sr_instance* sr)
 
     if( (sr->if_list == 0) || (sr->routing_table == 0))
     {
-        return 999; /* doh! */
+        return 0; /* doh! */
     }
 
     rt_walker = sr->routing_table;
@@ -292,7 +294,7 @@ int sr_verify_routing_table(struct sr_instance* sr)
         if_walker = sr->if_list;
         while(if_walker)
         {
-            if( strncmp(if_walker->name,rt_walker->interface,sr_IFACE_NAMELEN)
+            if( strncmp(if_walker->name,rt_walker->interface,SR_IFACE_NAMELEN)
                     == 0)
             { break; }
             if_walker = if_walker->next;

@@ -1,8 +1,8 @@
 /*-----------------------------------------------------------------------------
    File:   vnscommand.h
-   Date:   Sun Oct 11 20:27 PST 2009
    Contact:  dgu@cs.stanford.edu
    Description: A c-style declaration of commands for the virtual router.
+
   ---------------------------------------------------------------------------*/
 
 #ifndef __VNSCOMMAND_H
