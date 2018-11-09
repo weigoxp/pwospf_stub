@@ -154,8 +154,12 @@ void handleArp( struct sr_arphdr *arphdr,
         
         // handleArp(arphdr,sr, ethhdr,packet,len,interface);
 
+    unsigned char *out_addr_in_if = malloc(sizeof(unsigned char) * 6);
+    uint32_t my_ip = findAddrsForInterface(sr,interface, out_addr_in_if);
+    // now out_addr_in_if contains correct hardware address
+
     // if arp request, we simply open it, change it and send back.
-    if(ntohs(arphdr->ar_op)==ARP_REQUEST && arphdr->ar_tip==sr->if_list->ip){
+    if(ntohs(arphdr->ar_op)==ARP_REQUEST && arphdr->ar_tip==my_ip){
 
         printf("Router received an ARP request \n");
         // testarp(packet);
@@ -166,9 +170,9 @@ void handleArp( struct sr_arphdr *arphdr,
         arphdr->ar_tip = arphdr->ar_sip;
         arphdr->ar_sip = tmp;
         
-        unsigned char *out_addr_in_if = malloc(sizeof(unsigned char) * 6);
-        findAddrsForInterface(sr,interface, out_addr_in_if);
-        // now out_addr_in_if contains correct hardware address
+        // unsigned char *out_addr_in_if = malloc(sizeof(unsigned char) * 6);
+        // findAddrsForInterface(sr,interface, out_addr_in_if);
+        // // now out_addr_in_if contains correct hardware address
 
         //modify the arpMAC
         memcpy(arphdr->ar_tha,arphdr->ar_sha,6);

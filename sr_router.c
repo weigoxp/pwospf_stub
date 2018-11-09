@@ -80,13 +80,11 @@ void sr_handlepacket(struct sr_instance* sr,
     assert(packet);
     assert(interface);
 
-    printf("*** -> Received packet of length %d \n",len);
+    printf("*** -> Received packet of length %d @ %s\n",len, interface);
 
     struct sr_ethernet_hdr *ethhdr = (struct sr_ethernet_hdr *) packet;
     uint16_t ether_type = ethhdr -> ether_type;
 
-    // printf("The ether_type is  %x \n",ntohs(ether_type));
-    printf("Interface: %s\n", interface);
     // Arp packet
     if(ntohs(ether_type) == ETHERTYPE_ARP){
         struct sr_arphdr *arphdr = (struct sr_arphdr*) (packet+sizeof(struct sr_ethernet_hdr));

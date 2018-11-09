@@ -94,11 +94,11 @@ void* pwospf_run_thread(void* arg)
     {
         /* -- PWOSPF subsystem functionality should start  here! -- */
 
-        pwospf_lock(sr->ospf_subsys);
-        printf(" pwospf subsystem sleeping \n");
-        pwospf_unlock(sr->ospf_subsys);
-        sleep(2);
-        printf(" pwospf subsystem awake \n");
+        // pwospf_lock(sr->ospf_subsys);
+        // printf(" pwospf subsystem sleeping \n");
+        // pwospf_unlock(sr->ospf_subsys);
+        // sleep(2);
+        // printf(" pwospf subsystem awake \n");
     };
 } /* -- run_ospf_thread -- */
 
