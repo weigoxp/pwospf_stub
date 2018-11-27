@@ -1,7 +1,9 @@
 #ifndef SR_PACKETHANDLER_H
 #define SR_PACKETHANDLER_H
 
-
+#ifndef PWOSPF_IP_PROTOCOL
+#define PWOSPF_IP_PROTOCOL 89
+#endif
 
 struct ipunit
 {	

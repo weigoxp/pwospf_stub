@@ -9,6 +9,7 @@
 #include "sr_rt.h"
 #include "sr_protocol.h"
 #include "arp_cache.h"
+#include "pwospf_packet_handler.h"
 
 void send_icmp_echo_reply(  struct sr_instance* sr, 
                             uint8_t * packet, 
@@ -49,6 +50,11 @@ void handleIp(  struct ip* iphdr,
     if(iphdr->ip_v != 4)
         //drop;
         return;
+    if(iphdr->ip_p == PWOSPF_IP_PROTOCOL)
+    {   
+        handle_pwospf_packet(sr, packet, len, interface);
+        return;
+    }
 
     //check if the destination is router itself. and TCP/UDP, drop.
     uint32_t ipdst = (iphdr->ip_dst).s_addr;
@@ -291,6 +297,8 @@ void sendArpRequest(
 
 }
 //--------------------------------------------------------------------------------
+// the count parameter is a length of buf measured in 16-bit units. 
+// which is how many 2-byte are there in the buffer. 
 u_short checksum(u_short *buf, int count) {
 
     int i;
@@ -301,9 +309,7 @@ u_short checksum(u_short *buf, int count) {
         buf++;
 
     }
-
     return ~((sum +(sum >>16)) & 0xFFFF);
-
 }
 
 

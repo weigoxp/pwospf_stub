@@ -32,6 +32,10 @@ static const uint16_t OSPF_MAX_HELLO_SIZE  = 1024; /* bytes */
 static const uint16_t OSPF_MAX_LSU_SIZE    = 1024; /* bytes */
 static const uint8_t  OSPF_MAX_LSU_TTL     = 255;  
 
+static const uint32_t AREA_ID_IN_THIS_PROJECT = 0;
+static const uint16_t AU_TYPE_IN_THIS_PROJECT = 0;
+static const uint64_t AU_DATA_IN_THIS_PROJECT = 0;
+
 
 struct ospfv2_hdr
 {
