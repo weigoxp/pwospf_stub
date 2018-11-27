@@ -28,8 +28,8 @@ struct pwospf_interface
 	uint32_t ip_addr;
 	uint32_t mask;
 	uint16_t helloint; // interval in seconds between HELLO broadcasts
-	uint32_t neightbor_rid; // ID of the neighboring router.
-	uint32_t neightbor_ip_addr;
+	uint32_t neighbor_rid; // ID of the neighboring router.
+	uint32_t neighbor_ip_addr;
 	struct pwospf_interface *next;
 };
 

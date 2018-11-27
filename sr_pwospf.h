@@ -41,6 +41,6 @@ extern struct pwospf_router *topology;
 int pwospf_init(struct sr_instance* sr);
 void pwospf_build_ospf_hdr(struct ospfv2_hdr *ptr, struct sr_instance* sr);
 void pwospf_send_hello(struct sr_instance* sr);
-
+void print_topology_structs();
 
 #endif /* SR_PWOSPF_H */

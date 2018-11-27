@@ -53,6 +53,7 @@ int pwospf_init(struct sr_instance* sr)
     topology->aid = AREA_ID_IN_THIS_PROJECT;
     topology->lsuint = OSPF_DEFAULT_LSUINT;
 
+
     topology->ifs = malloc(sizeof(struct pwospf_interface));
     struct pwospf_interface *topology_ifs = topology->ifs;
     struct sr_if *interfaces = sr->if_list;
@@ -66,14 +67,19 @@ int pwospf_init(struct sr_instance* sr)
     topology_ifs = topology->ifs;
     while(interfaces)
     {
+        //printf("%p\n", interfaces);
         topology_ifs->ip_addr = interfaces->ip;
         topology_ifs->mask = interfaces->mask;
         topology_ifs->helloint = OSPF_DEFAULT_HELLOINT;
 
         topology_ifs = topology_ifs->next;
+        interfaces = interfaces->next;
     }
-
     // ------------- initialization of topology structs -------------⬆
+
+    // TESTING initial topology structures. 
+    print_topology_structs();
+
 
     /* -- start thread subsystem -- */
     if( pthread_create(&sr->ospf_subsys->thread, 0, pwospf_run_thread, sr)) {
@@ -230,6 +236,40 @@ void pwospf_send_hello(struct sr_instance* sr)
 
 }
 
+void print_topology_structs()
+{
+    struct pwospf_router *pointer = topology;
+    int n = 0;
+    
+    while(pointer)
+    {
+        printf("================ Router %d ================\n", n);
+        struct in_addr ip_temp = {.s_addr = pointer->rid};
+        printf("\tRouter ID: %s\n", inet_ntoa(ip_temp));
+        printf("\tArea ID: %d\n", pointer->aid);
+        printf("\tLSU int: %d\n", pointer->lsuint);
+        
+        struct pwospf_interface *interface_p = pointer->ifs;
+        while(interface_p)
+        {
+            printf("\t---------- Interfaces ----------\n");
+            ip_temp.s_addr = interface_p->ip_addr;
+            printf("\tIP address: %s\n", inet_ntoa(ip_temp));
+            ip_temp.s_addr = interface_p->mask;
+            printf("\tMask: %s\n", inet_ntoa(ip_temp));
+            printf("\tHello int: %d\n", interface_p->helloint);
+            ip_temp.s_addr = interface_p->neighbor_rid;
+            printf("\tNeighbor RID: %s\n", inet_ntoa(ip_temp));
+            ip_temp.s_addr = interface_p->neighbor_ip_addr;
+            printf("\tNeighbor IP address: %s\n", inet_ntoa(ip_temp));
+            interface_p = interface_p->next;
+            printf("\t--------------------------------\n");
+        }
+        pointer = pointer->next;
+        n++;
+        printf("==========================================\n");
+    }
+}
 
 
 
