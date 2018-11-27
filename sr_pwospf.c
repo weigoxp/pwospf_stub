@@ -83,6 +83,7 @@ int pwospf_init(struct sr_instance* sr)
 
     /* -- start thread subsystem -- */
     if( pthread_create(&sr->ospf_subsys->thread, 0, pwospf_run_thread, sr)) {
+
         perror("pthread_create");
         assert(0);
     }
@@ -132,12 +133,19 @@ void* pwospf_run_thread(void* arg)
     while(1)
     {
         /* -- PWOSPF subsystem functionality should start  here! -- */
-        pwospf_send_hello(sr);
-
+        int count=0;
         pwospf_lock(sr->ospf_subsys);
-        printf(" pwospf subsystem sleeping \n");
+
+        pwospf_send_hello(sr);
+        count++; 
+        if(count%6 ==0)
+            pwospf_send_LSU(sr); 
+
         pwospf_unlock(sr->ospf_subsys);
-        sleep(2);
+        printf(" pwospf subsystem sleeping for 5 secs\n");
+        // sleep for 5 secs
+        sleep(OSPF_DEFAULT_HELLOINT); 
+
         printf(" pwospf subsystem awake \n");
     };
 } /* -- run_ospf_thread -- */
