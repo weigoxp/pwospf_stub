@@ -9,6 +9,7 @@
 #include "sr_rt.h"
 #include "sr_protocol.h"
 #include "arp_cache.h"
+#include "pwospf_packet_handler.h"
 
 void send_icmp_echo_reply(  struct sr_instance* sr, 
                             uint8_t * packet, 
@@ -52,6 +53,11 @@ void handleIp(  struct ip* iphdr,
     if(iphdr->ip_v != 4)
         //drop;
         return;
+    if(iphdr->ip_p == PWOSPF_IP_PROTOCOL)
+    {   
+        handle_pwospf_packet(sr, packet, len, interface);
+        return;
+    }
 
     //check if the destination is router itself. and TCP/UDP, drop.
     uint32_t ipdst = (iphdr->ip_dst).s_addr;
@@ -157,8 +163,12 @@ void handleArp( struct sr_arphdr *arphdr,
         
         // handleArp(arphdr,sr, ethhdr,packet,len,interface);
 
+    unsigned char *out_addr_in_if = malloc(sizeof(unsigned char) * 6);
+    uint32_t my_ip = findAddrsForInterface(sr,interface, out_addr_in_if);
+    // now out_addr_in_if contains correct hardware address
+
     // if arp request, we simply open it, change it and send back.
-    if(ntohs(arphdr->ar_op)==ARP_REQUEST && arphdr->ar_tip==sr->if_list->ip){
+    if(ntohs(arphdr->ar_op)==ARP_REQUEST && arphdr->ar_tip==my_ip){
 
         printf("Router received an ARP request \n");
         // testarp(packet);
@@ -169,9 +179,9 @@ void handleArp( struct sr_arphdr *arphdr,
         arphdr->ar_tip = arphdr->ar_sip;
         arphdr->ar_sip = tmp;
         
-        unsigned char *out_addr_in_if = malloc(sizeof(unsigned char) * 6);
-        findAddrsForInterface(sr,interface, out_addr_in_if);
-        // now out_addr_in_if contains correct hardware address
+        // unsigned char *out_addr_in_if = malloc(sizeof(unsigned char) * 6);
+        // findAddrsForInterface(sr,interface, out_addr_in_if);
+        // // now out_addr_in_if contains correct hardware address
 
         //modify the arpMAC
         memcpy(arphdr->ar_tha,arphdr->ar_sha,6);
@@ -290,6 +300,8 @@ void sendArpRequest(
 
 }
 //--------------------------------------------------------------------------------
+// the count parameter is a length of buf measured in 16-bit units. 
+// which is how many 2-byte are there in the buffer. 
 u_short checksum(u_short *buf, int count) {
 
     int i;
@@ -300,9 +312,7 @@ u_short checksum(u_short *buf, int count) {
         buf++;
 
     }
-
     return ~((sum +(sum >>16)) & 0xFFFF);
-
 }
 
 

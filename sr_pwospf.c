@@ -77,7 +77,10 @@ int pwospf_init(struct sr_instance* sr)
 
     /* -- start thread subsystem -- */
     if( pthread_create(&sr->ospf_subsys->thread, 0, pwospf_run_thread, sr)) {
+<<<<<<< HEAD
 
+=======
+>>>>>>> f1ff0375e1d461695cc75fd352c3b6b53bbc05a2
         perror("pthread_create");
         assert(0);
     }
@@ -132,7 +135,6 @@ void* pwospf_run_thread(void* arg)
 
         pwospf_send_hello(sr);
         count++; 
-        
         if(count%6 ==0)
             pwospf_send_LSU(sr); 
 

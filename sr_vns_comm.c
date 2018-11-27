@@ -40,6 +40,7 @@
 #include "sr_router.h"
 #include "sr_if.h"
 #include "sr_protocol.h"
+#include "sr_pwospf.h"
 
 #include "sha1.h"
 #include "vnscommand.h"
@@ -208,6 +209,7 @@ int sr_handle_hwinfo(struct sr_instance* sr, c_hwinfo* hwinfo)
             case HWMASK:
                 /* Debug("Mask: %s\n",inet_ntoa(
                             *((struct in_addr*)(hwinfo->mHWInfo[i].value)))); */
+                sr_set_ether_mask(sr,*((uint32_t*)hwinfo->mHWInfo[i].value));
                 break;
             case HWETHIP:
                 /*Debug("IP: %s\n",inet_ntoa(
@@ -486,6 +488,8 @@ int sr_read_from_server_expect(struct sr_instance* sr /* borrowed */, int expect
                 fprintf(stderr,"Routing table not consistent with hardware\n");
                 return -1;
             }
+            /* Initialization for control subsystem. */
+            pwospf_init(sr);
             printf(" <-- Ready to process packets --> \n");
             break;
 
