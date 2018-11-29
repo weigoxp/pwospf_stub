@@ -23,11 +23,14 @@ void handle_pwospf_packet(	struct sr_instance* sr,
 	{
 		printf("收到有效的HELLO！来自%s\n", inet_ntoa(ip_temp));
 		handle_pwospf_hello(packet, interface);
+		// report topology updated.
+		printf("@@@ UPDATED topology:\n");
+		print_topology_structs();
 	}
 	if (ospf_hdr->type == OSPF_TYPE_LSU)
 	{
 		printf("收到有效的LSU！来自%s\n", inet_ntoa(ip_temp));
-		handle_pwospf_lsu();
+		handle_pwospf_lsu(packet, interface);
 	}
 
 
@@ -44,7 +47,8 @@ void handle_pwospf_packet(	struct sr_instance* sr,
  *	Note: The hello message can only modify current router's neighbors, not other routers and their interfaces. 
  *
  * Parameters:
- *      sr: The instance of current router
+ *      packet: The whole packet including Ethernet and IP header. 
+ * 		interface: specifies which interface the packet comes from. 
  *  
  * Return: None.
  *
@@ -52,39 +56,83 @@ void handle_pwospf_packet(	struct sr_instance* sr,
  */
 void handle_pwospf_hello(uint8_t * packet, char* interface)
 {
-	// // need neighbor ip and rid. both uint32_t.
-	// struct ip *ip_hdr = (struct ip *) (packet + sizeof(struct sr_ethernet_hdr));
-	// struct pwospf_interface *current_ifs = topology->ifs;
-	// while(current_ifs)
-	// {
-	// 	if(strcmp(current_ifs->name, interface))
-	// 	{
-	// 		// found the correct interface to fill the info in hello. 
-	// 		return;
-	// 	}
-	// 	current_ifs = current_ifs->next; 
-	// }
-	// printf("Unrecognized interface %s\n", interface);
-
+	// need neighbor ip and rid. both uint32_t.
+	struct ip *ip_hdr = (struct ip *) (packet + sizeof(struct sr_ethernet_hdr));
+	struct ospfv2_hdr *ospf_hdr = (struct ospfv2_hdr *) (packet + sizeof(struct sr_ethernet_hdr) + sizeof(struct ip));
+	struct pwospf_interface *current_ifs = topology->ifs;
+	while(current_ifs)
+	{
+		if(strcmp(current_ifs->name, interface) == 0)
+		{
+			// found the correct interface to fill the rid and ip from hello. 
+			current_ifs->neighbor_rid = ospf_hdr->rid;
+			current_ifs->neighbor_ip_addr = ip_hdr->ip_src.s_addr;
+			current_ifs->ts = time(NULL);
+			return;
+		}
+		current_ifs = current_ifs->next; 
+	}
+	printf("Unrecognized interface %s\n", interface);
 }
 
-
+struct pwospf_router * get_router_with_rid(uint32_t rid)
+{
+	struct pwospf_router *routers = topology;
+	while(routers)
+	{
+		if(routers->rid == rid)
+		{
+			return routers;
+		}
+	}
+	return NULL;
+}
 
 /*
  *----------------------------------------------------------------------
  *
  * handle_pwospf_lsu --
  *
- * This function ...  
+ * This function is called if the ospf packet handler recognizes the packet is a link state update message
+ * The information is about routers in the whole topology, not necessarily our neighbors. 
+ * After update the topology data structure, we need to forward the LSU to all of our interfaces except the one that we receive this LSU.
+ *
+ * Note: The LSU message *SHOULD* modify the router list, add more if a new router showed up in the update. 
  *
  * Parameters:
- *      
+ *      packet: The whole packet including Ethernet and IP header. 
+ * 		interface: specifies which interface the packet comes from. (Need *NOT* to forward to this interface)
  *  
  * Return: None.
  *
  *----------------------------------------------------------------------
  */
-void handle_pwospf_lsu()
+void handle_pwospf_lsu(uint8_t * packet, char* interface)
 {
+	// We surely need to know which router sends this packet, identify this from OSPF header.
+	struct ospfv2_hdr *ospf_hdr = (struct ospfv2_hdr *) (packet + sizeof(struct sr_ethernet_hdr) + sizeof(struct ip));
+	// need to loop through router list to find this one. 
+	struct pwospf_router *routers = topology;
+	// first check if the packet is from current router:
+	if(routers->rid == ospf_hdr->rid){
+		// the LSU is *FROM* us, drop
+		return;
+	}
+
+	// then check the whole topology.
+	struct pwospf_router *result_router = get_router_with_rid(ospf_hdr->rid);
+	if(result_router != NULL){
+		// if we find exsiting router in the topology structure. 
+	}
+	else{
+		// this is a new router, we need to add it into the topology structure.
+	}
 
 }
+
+
+
+
+
+
+

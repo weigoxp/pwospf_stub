@@ -27,7 +27,7 @@ struct pwospf_router
 
 struct pwospf_interface
 {
-	// char *name;
+	char name[SR_IFACE_NAMELEN];
 	uint32_t ip_addr;
 	uint32_t mask;
 	uint16_t helloint; // interval in seconds between HELLO broadcasts
@@ -43,6 +43,6 @@ void handle_pwospf_packet(	struct sr_instance* sr,
                 			char* interface);
 
 void handle_pwospf_hello(uint8_t * packet, char* interface);
-void handle_pwospf_lsu();
+void handle_pwospf_lsu(uint8_t * packet, char* interface);
 
 #endif

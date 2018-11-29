@@ -67,19 +67,19 @@ int pwospf_init(struct sr_instance* sr)
     interfaces = sr->if_list;
     topology_ifs = topology->ifs;
 
-    // TODO: here checks the topology interfaces has 4 instances.
-    while(topology_ifs)
-    {
-        printf("0\n");
-        topology_ifs = topology_ifs->next;
-    }
-    topology_ifs = topology->ifs;
-    // TODO Removing of name field makes it 3 instances. 
+    // // TODO: here checks the topology interfaces has 4 instances.
+    // while(topology_ifs)
+    // {
+    //     printf("0\n");
+    //     topology_ifs = topology_ifs->next;
+    // }
+    // topology_ifs = topology->ifs;
+
 
     while(interfaces)
     {
         //printf("%p\n", interfaces);
-        //strcpy(topology_ifs->name, interfaces->name);
+        strcpy(topology_ifs->name, interfaces->name);
         topology_ifs->ip_addr = interfaces->ip;
         topology_ifs->mask = interfaces->mask;
         topology_ifs->helloint = OSPF_DEFAULT_HELLOINT;
@@ -279,7 +279,7 @@ void print_topology_structs()
         while(interface_p)
         {
             printf("\t---------- Interface ----------\n");
-            // printf("\tName: %s\n", interface_p->name);
+            printf("\tName: %s\n", interface_p->name);
             ip_temp.s_addr = interface_p->ip_addr;
             printf("\tIP address: %s\n", inet_ntoa(ip_temp));
             ip_temp.s_addr = interface_p->mask;
@@ -289,6 +289,8 @@ void print_topology_structs()
             printf("\tNeighbor RID: %s\n", inet_ntoa(ip_temp));
             ip_temp.s_addr = interface_p->neighbor_ip_addr;
             printf("\tNeighbor IP address: %s\n", inet_ntoa(ip_temp));
+            char *t = ctime(&(interface_p->ts));
+            printf("\tTime Stamp: %s\n", t);
             interface_p = interface_p->next;
             printf("\t-------------------------------\n");
         }
