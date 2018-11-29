@@ -145,7 +145,7 @@ void* pwospf_run_thread(void* arg)
     while(1)
     {
         /* -- PWOSPF subsystem functionality should start  here! -- */
-        
+
         pwospf_lock(sr->ospf_subsys);
 
         pwospf_send_hello(sr);
@@ -177,12 +177,12 @@ void* pwospf_run_thread(void* arg)
  *
  *----------------------------------------------------------------------
  */
-void pwospf_build_ospf_hdr(struct ospfv2_hdr *ptr, struct sr_instance* sr)
+void pwospf_build_ospf_hdr(struct ospfv2_hdr *ptr, struct sr_instance* sr, uint8_t OSPF_TYPE)
 {
     // set the version to be v2
     ptr->version = OSPF_V2;
     // set the OSPF type to be hello(1)
-    ptr->type = OSPF_TYPE_HELLO;
+    ptr->type = OSPF_TYPE;
     ptr->len = sizeof(ptr);
     // set source router ID
     ptr->rid = sr->if_list->ip;
@@ -215,7 +215,81 @@ void pwospf_send_hello(struct sr_instance* sr)
     {
 
         // the packet include a Ethernet header, IP header, OSPF header and OSPF hello header.
-        void *packet = malloc(sizeof(struct sr_ethernet_hdr) + sizeof(struct ip) + sizeof(struct ospfv2_hdr) + sizeof(struct ospfv2_hello_hdr));
+        void *packet = malloc(sizeof(struct sr_ethernet_hdr) + 
+                                sizeof(struct ip) + sizeof(struct ospfv2_hdr) + 
+                                sizeof(struct ospfv2_hello_hdr));
+        // Ethernet header filling is done inside the function below: 
+        struct sr_ethernet_hdr *e_hdr = (struct sr_ethernet_hdr *) packet;
+        memset(e_hdr->ether_dhost, 0xFF, 6);
+        memcpy(e_hdr->ether_shost, interfaces->addr, 6);
+        e_hdr->ether_type = htons(ETHERTYPE_IP);
+        // DONE with Ethernet header
+
+        // fill IP header
+        struct ip *ip_hdr = packet + sizeof(struct sr_ethernet_hdr);
+        ip_hdr->ip_v = 4;  
+        ip_hdr->ip_hl = 5; // length = 5* 4 =20
+        ip_hdr->ip_tos = 0;
+        ip_hdr->ip_len = htons(sizeof(struct ip) + sizeof(struct ospfv2_hdr) + sizeof(struct ospfv2_hello_hdr));
+        ip_hdr->ip_id = 0;
+        ip_hdr->ip_off = 0;
+        ip_hdr->ip_ttl = 3;
+        ip_hdr->ip_p = 89;  //ospf identifier
+        ip_hdr->ip_src.s_addr = interfaces->ip;
+        ip_hdr->ip_dst.s_addr = OSPF_AllSPFRouters;
+        u_short chksum;
+        chksum = checksum((u_short *)ip_hdr, ip_hdr->ip_hl*2);
+        ip_hdr->ip_sum = htons(chksum);
+        // DONE with IP header
+
+        // allocate the memroy for ospf header and hello header, that's all we need for a hello packet.
+        struct ospfv2_hdr *ospf_hdr = packet + sizeof(struct sr_ethernet_hdr) + sizeof(struct ip);
+        pwospf_build_ospf_hdr(ospf_hdr, sr, OSPF_TYPE_HELLO);
+
+        // fill in hello header
+        struct ospfv2_hello_hdr *hello_hdr = packet + sizeof(struct sr_ethernet_hdr) + sizeof(struct ip) + sizeof(struct ospfv2_hdr);
+        hello_hdr->nmask = interfaces->mask;
+        hello_hdr->helloint = OSPF_DEFAULT_HELLOINT;
+
+        // ready to send packet. 
+        sr_send_packet(sr, packet, 
+                        sizeof(struct sr_ethernet_hdr) + sizeof(struct ip)+
+                        sizeof(struct ospfv2_hdr) + sizeof(struct ospfv2_hello_hdr)
+                            , interfaces->name);
+        interfaces = interfaces->next;
+    }
+    printf("已给所有interface发Hello。\n");
+
+}
+
+void pwospf_send_LSU(struct sr_instance* sr)
+{
+    printf("(假装)已给所有neighbor发LSU。\n");
+}
+/*
+ *----------------------------------------------------------------------
+ *
+ * pwospf_send_LSU
+ *
+ *  This function send a LSU message to all the neighbors ONCE. 
+ *
+ * Parameters:
+ *      sr: The instance of current router
+ *  
+ * Return: None.
+ *
+ *----------------------------------------------------------------------
+ */
+void pwospf_send_LSU(struct sr_instance* sr){
+   struct sr_if *interfaces = sr->if_list;
+    // iterate through all the interfaces, send 1 hello through each interface.
+    while(interfaces)
+    {
+
+        // the packet include a Ethernet header, IP header, OSPF header and OSPF hello header.
+        void *packet = malloc(sizeof(struct sr_ethernet_hdr) + 
+                                sizeof(struct ip) + sizeof(struct ospfv2_hdr) + 
+                                sizeof(struct ospfv2_lsu_hdr));
         // Ethernet header filling is done inside the function below: 
         struct sr_ethernet_hdr *e_hdr = (struct sr_ethernet_hdr *) packet;
         memset(e_hdr->ether_dhost, 0xFF, 6);
@@ -228,7 +302,7 @@ void pwospf_send_hello(struct sr_instance* sr)
         ip_hdr->ip_v = 4;
         ip_hdr->ip_hl = 5;
         ip_hdr->ip_tos = 0;
-        ip_hdr->ip_len = htons(sizeof(struct ip) + sizeof(struct ospfv2_hdr) + sizeof(struct ospfv2_hello_hdr));
+        ip_hdr->ip_len = htons(sizeof(struct ip) + sizeof(struct ospfv2_hdr) + sizeof(struct ospfv2_lsu_hdr));
         ip_hdr->ip_id = 0;
         ip_hdr->ip_off = 0;
         ip_hdr->ip_ttl = 3;
@@ -240,26 +314,21 @@ void pwospf_send_hello(struct sr_instance* sr)
         ip_hdr->ip_sum = htons(chksum);
         // DONE with IP header
 
-        // allocate the memroy for ospf header and hello header, that's all we need for a hello packet.
-        struct ospfv2_hdr *ospf_hdr = packet + sizeof(struct sr_ethernet_hdr) + sizeof(struct ip);
-        pwospf_build_ospf_hdr(ospf_hdr, sr);
 
-        // fill in hello header
+
+
+
+        // allocate the memroy for ospf header and lsu header
+        struct ospfv2_hdr *ospf_hdr = packet + sizeof(struct sr_ethernet_hdr) + sizeof(struct ip);
+        pwospf_build_ospf_hdr(ospf_hdr, sr, OSPF_TYPE_LSU);
+
+        // fill in lsu header
         struct ospfv2_hello_hdr *hello_hdr = packet + sizeof(struct sr_ethernet_hdr) + sizeof(struct ip) + sizeof(struct ospfv2_hdr);
         hello_hdr->nmask = interfaces->mask;
         hello_hdr->helloint = OSPF_DEFAULT_HELLOINT;
 
-        // ready to send packet. 
-        sr_send_packet(sr, packet, sizeof(struct sr_ethernet_hdr) + sizeof(struct ip) + sizeof(struct ospfv2_hdr) + sizeof(struct ospfv2_hello_hdr), interfaces->name);
-        interfaces = interfaces->next;
     }
-    printf("已给所有interface发Hello。\n");
 
-}
-
-void pwospf_send_LSU(struct sr_instance* sr)
-{
-    printf("(假装)已给所有neighbor发LSU。\n");
 }
 
 void print_topology_structs()
