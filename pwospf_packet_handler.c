@@ -87,6 +87,7 @@ struct pwospf_router * get_router_with_rid(uint32_t rid)
 		{
 			return routers;
 		}
+		routers = routers->next;
 	}
 	return NULL;
 }
@@ -161,22 +162,30 @@ void handle_pwospf_lsu(uint8_t * packet, char* interface)
 	result_router->ifs = malloc(sizeof(struct pwospf_interface));
 	struct pwospf_interface *ifs = result_router->ifs;
 	struct ospfv2_lsu *lsu = (struct ospfv2_lsu *) (lsu_hdr + sizeof(struct ospfv2_lsu_hdr));
-	ifs->ip_addr = lsu->subnet;
-	ifs->mask = lsu->mask;
-	ifs->neighbor_rid = lsu->rid;
+	strcpy(ifs->name, "Unknown");
+	ifs->ip_addr = (lsu->subnet);
+	ifs->mask = (lsu->mask);
+	ifs->helloint = OSPF_DEFAULT_HELLOINT;
+	ifs->neighbor_rid = (lsu->rid);
+	ifs->neighbor_ip_addr = 0;
+	ifs->ts = 0;
 	// now the rest of advertisements.
 
-	printf("!@%ld\n", ntohl(lsu_hdr->num_adv));
+	printf("!@%d\n", (lsu_hdr->num_adv));
 	int i; // initially 1 for skipping one above.
 	for (i = 1; i < ntohl(lsu_hdr->num_adv); ++i)
 	{
-		printf("0\n");
+		printf("MORE LSU\n");
 		ifs->next = malloc(sizeof(struct pwospf_interface));
 		ifs = ifs->next;
 		lsu += sizeof(struct ospfv2_lsu);
-		ifs->ip_addr = lsu->subnet;
-		ifs->mask = lsu->mask;
-		ifs->neighbor_rid = lsu->rid;
+		strcpy(ifs->name, "Unknown");
+		ifs->ip_addr = ntohl(lsu->subnet);
+		ifs->mask = ntohl(lsu->mask);
+		ifs->helloint = OSPF_DEFAULT_HELLOINT;
+		ifs->neighbor_rid = ntohl(lsu->rid);
+		ifs->neighbor_ip_addr = 0;
+		ifs->ts = 0;
 	}
 
 }

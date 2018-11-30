@@ -339,8 +339,8 @@ void pwospf_send_hello(struct sr_instance* sr)
         struct pwospf_interface *pwospf_ifs = topology->ifs;
 
         while(pwospf_ifs){
-            struct ospfv2_lsu *lsu = (void*) lsu_hdr+sizeof(struct ospfv2_lsu_hdr)+i*sizeof(struct ospfv2_lsu);
-            lsu ->subnet = pwospf_ifs->neighbor_ip_addr;
+            struct ospfv2_lsu *lsu = (struct ospfv2_lsu *) (lsu_hdr+sizeof(struct ospfv2_lsu_hdr) + i * sizeof(struct ospfv2_lsu));
+            lsu ->subnet = pwospf_ifs->ip_addr;
             lsu -> mask = pwospf_ifs->mask;
             lsu -> rid = pwospf_ifs->neighbor_rid;
             pwospf_ifs= pwospf_ifs->next;
