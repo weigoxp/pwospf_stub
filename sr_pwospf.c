@@ -331,7 +331,7 @@ void pwospf_send_hello(struct sr_instance* sr)
         //lsu_hdr->seq = topology->seq ;
 
         lsu_hdr->ttl = OSPF_MAX_LSU_TTL; // 255
-        lsu_hdr->num_adv = htonl(3); //We hardcode it to 3 here. 
+        lsu_hdr->num_adv = (3); //We hardcode it to 3 here. 
 
         // fill in lsu advertisement
         int i =0;
@@ -339,7 +339,7 @@ void pwospf_send_hello(struct sr_instance* sr)
         struct pwospf_interface *pwospf_ifs = topology->ifs;
 
         while(pwospf_ifs){
-            struct ospfv2_lsu *lsu = (struct ospfv2_lsu *) (lsu_hdr+sizeof(struct ospfv2_lsu_hdr) + i * sizeof(struct ospfv2_lsu));
+            struct ospfv2_lsu *lsu = (struct ospfv2_lsu *) (packet + sizeof(struct sr_ethernet_hdr) + sizeof(struct ip) + sizeof(struct ospfv2_hdr) + sizeof(struct ospfv2_lsu_hdr) + i * sizeof(struct ospfv2_lsu));
             lsu ->subnet = pwospf_ifs->ip_addr;
             lsu -> mask = pwospf_ifs->mask;
             lsu -> rid = pwospf_ifs->neighbor_rid;
@@ -347,6 +347,12 @@ void pwospf_send_hello(struct sr_instance* sr)
             i++;
         }
 
+        // ----------
+        struct ospfv2_lsu *t = packet + sizeof(struct sr_ethernet_hdr) + sizeof(struct ip) + sizeof(struct ospfv2_hdr) + sizeof(struct ospfv2_lsu_hdr) + sizeof(struct ospfv2_lsu);
+        struct in_addr tt = {.s_addr = t->subnet};
+        printf("~~~~~~~~~%s\n", inet_ntoa(tt));
+
+        // ----------
         // ready to send packet. 
         sr_send_packet(sr, packet,sizeof(struct sr_ethernet_hdr) + sizeof(struct ip)+
                                     sizeof(struct ospfv2_hdr) + sizeof(struct ospfv2_hello_hdr)

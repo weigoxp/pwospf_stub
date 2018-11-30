@@ -140,7 +140,7 @@ void handle_pwospf_lsu(uint8_t * packet, char* interface)
 {
 	// We surely need to know which router sends this packet, identify this from OSPF header.
 	struct ospfv2_hdr *ospf_hdr = (struct ospfv2_hdr *) (packet + sizeof(struct sr_ethernet_hdr) + sizeof(struct ip));
-	struct ospfv2_lsu_hdr *lsu_hdr = (struct ospfv2_lsu_hdr *) (ospf_hdr + sizeof(struct ospfv2_hdr));
+	struct ospfv2_lsu_hdr *lsu_hdr = (struct ospfv2_lsu_hdr *) (packet + sizeof(struct sr_ethernet_hdr) + sizeof(struct ip) + sizeof(struct ospfv2_hdr));
 	// need to loop through router list to find this one. 
 	struct pwospf_router *routers = topology;
 	// first check if the packet is from current router:
@@ -161,7 +161,7 @@ void handle_pwospf_lsu(uint8_t * packet, char* interface)
 	// the first one: 
 	result_router->ifs = malloc(sizeof(struct pwospf_interface));
 	struct pwospf_interface *ifs = result_router->ifs;
-	struct ospfv2_lsu *lsu = (struct ospfv2_lsu *) (lsu_hdr + sizeof(struct ospfv2_lsu_hdr));
+	struct ospfv2_lsu *lsu = (struct ospfv2_lsu *) (packet + sizeof(struct sr_ethernet_hdr) + sizeof(struct ip) + sizeof(struct ospfv2_hdr) + sizeof(struct ospfv2_lsu_hdr));
 	strcpy(ifs->name, "Unknown");
 	ifs->ip_addr = (lsu->subnet);
 	ifs->mask = (lsu->mask);
@@ -173,17 +173,17 @@ void handle_pwospf_lsu(uint8_t * packet, char* interface)
 
 	printf("!@%d\n", (lsu_hdr->num_adv));
 	int i; // initially 1 for skipping one above.
-	for (i = 1; i < ntohl(lsu_hdr->num_adv); ++i)
+	for (i = 1; i < (lsu_hdr->num_adv); ++i)
 	{
 		printf("MORE LSU\n");
 		ifs->next = malloc(sizeof(struct pwospf_interface));
 		ifs = ifs->next;
-		lsu += sizeof(struct ospfv2_lsu);
+		lsu = (struct ospfv2_lsu *) (packet + sizeof(struct sr_ethernet_hdr) + sizeof(struct ip) + sizeof(struct ospfv2_hdr) + sizeof(struct ospfv2_lsu_hdr) + i * sizeof(struct ospfv2_lsu));
 		strcpy(ifs->name, "Unknown");
-		ifs->ip_addr = ntohl(lsu->subnet);
-		ifs->mask = ntohl(lsu->mask);
+		ifs->ip_addr = (lsu->subnet);
+		ifs->mask = (lsu->mask);
 		ifs->helloint = OSPF_DEFAULT_HELLOINT;
-		ifs->neighbor_rid = ntohl(lsu->rid);
+		ifs->neighbor_rid = (lsu->rid);
 		ifs->neighbor_ip_addr = 0;
 		ifs->ts = 0;
 	}
