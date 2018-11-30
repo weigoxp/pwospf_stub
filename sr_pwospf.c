@@ -324,15 +324,20 @@ void pwospf_send_hello(struct sr_instance* sr)
         struct ospfv2_hdr *ospf_hdr = packet + sizeof(struct sr_ethernet_hdr) + sizeof(struct ip);
         pwospf_build_ospf_hdr(ospf_hdr, sr, OSPF_TYPE_LSU);
 
+
         // fill in lsu header
         struct ospfv2_lsu_hdr *lsu_hdr = packet + sizeof(struct sr_ethernet_hdr) + sizeof(struct ip) + sizeof(struct ospfv2_hdr);
-        // lsu_hdr->seq = ;
+
+        //lsu_hdr->seq = topology->seq ;
+
         lsu_hdr->ttl = OSPF_MAX_LSU_TTL; // 255
         lsu_hdr->num_adv = htonl(3); //We hardcode it to 3 here. 
 
         // fill in lsu advertisement
         int i =0;
+        //topology->ifs  first router, which is 
         struct pwospf_interface *pwospf_ifs = topology->ifs;
+
         while(pwospf_ifs){
             struct ospfv2_lsu *lsu = (void*) lsu_hdr+sizeof(struct ospfv2_lsu_hdr)+i*sizeof(struct ospfv2_lsu);
             lsu ->subnet = pwospf_ifs->neighbor_ip_addr;
