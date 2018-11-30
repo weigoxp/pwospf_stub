@@ -262,10 +262,10 @@ void pwospf_send_hello(struct sr_instance* sr)
 
 }
 
-void pwospf_send_LSU(struct sr_instance* sr)
-{
-    printf("(假装)已给所有neighbor发LSU。\n");
-}
+// void pwospf_send_LSU(struct sr_instance* sr)
+// {
+//     printf("(假装)已给所有neighbor发LSU。\n");
+// }
 /*
  *----------------------------------------------------------------------
  *
@@ -280,16 +280,22 @@ void pwospf_send_LSU(struct sr_instance* sr)
  *
  *----------------------------------------------------------------------
  */
-void pwospf_send_LSU(struct sr_instance* sr){
+
+
+
+ void pwospf_send_LSU(struct sr_instance* sr )
+{
    struct sr_if *interfaces = sr->if_list;
-    // iterate through all the interfaces, send 1 hello through each interface.
+
     while(interfaces)
     {
 
-        // the packet include a Ethernet header, IP header, OSPF header and OSPF hello header.
+        // the packet include a Ethernet header, IP header, OSPF header and OSPF LSU header.
         void *packet = malloc(sizeof(struct sr_ethernet_hdr) + 
                                 sizeof(struct ip) + sizeof(struct ospfv2_hdr) + 
-                                sizeof(struct ospfv2_lsu_hdr));
+                                sizeof(struct ospfv2_lsu_hdr)+
+                                3*sizeof(struct ospfv2_lsu));
+
         // Ethernet header filling is done inside the function below: 
         struct sr_ethernet_hdr *e_hdr = (struct sr_ethernet_hdr *) packet;
         memset(e_hdr->ether_dhost, 0xFF, 6);
@@ -314,22 +320,40 @@ void pwospf_send_LSU(struct sr_instance* sr){
         ip_hdr->ip_sum = htons(chksum);
         // DONE with IP header
 
-
-
-
-
         // allocate the memroy for ospf header and lsu header
         struct ospfv2_hdr *ospf_hdr = packet + sizeof(struct sr_ethernet_hdr) + sizeof(struct ip);
         pwospf_build_ospf_hdr(ospf_hdr, sr, OSPF_TYPE_LSU);
 
         // fill in lsu header
-        struct ospfv2_hello_hdr *hello_hdr = packet + sizeof(struct sr_ethernet_hdr) + sizeof(struct ip) + sizeof(struct ospfv2_hdr);
-        hello_hdr->nmask = interfaces->mask;
-        hello_hdr->helloint = OSPF_DEFAULT_HELLOINT;
+        struct ospfv2_lsu_hdr *lsu_hdr = packet + sizeof(struct sr_ethernet_hdr) + sizeof(struct ip) + sizeof(struct ospfv2_hdr);
+        lsu_hdr->seq = ;
+        lsu_hdr->ttl = OSPF_MAX_LSU_TTL; // 255
+        lsu_hdr->num_adv = htonl(3); //We hardcode it to 3 here. 
 
+        // fill in lsu advertisement
+        int i =0;
+        struct pwospf_interface *pwospf_ifs = topology->ifs;
+        while(pwospf_ifs){
+            struct ospfv2_lsu *lsu = (void*) lsu_hdr+sizeof(struct ospfv2_lsu_hdr)+i*sizeof(struct ospfv2_lsu);
+            lsu ->subnet = pwospf_ifs->neighbor_ip_addr;
+            lsu -> mask = pwospf_ifs->mask;
+            lsu -> rid = pwospf_ifs->neighbor_rid;
+            pwospf_ifs= pwospf_ifs->next;
+            i++;
+        }
+
+        // ready to send packet. 
+        sr_send_packet(sr, packet,sizeof(struct sr_ethernet_hdr) + sizeof(struct ip)+
+                                    sizeof(struct ospfv2_hdr) + sizeof(struct ospfv2_hello_hdr)
+                                    +3*sizeof(struct ospfv2_lsu), 
+                                    interfaces->name);
+
+        interfaces = interfaces->next;
     }
-
+    printf("已给所有neighbor发LSU。\n");
 }
+
+
 
 void print_topology_structs()
 {
