@@ -31,6 +31,9 @@ void handle_pwospf_packet(	struct sr_instance* sr,
 	{
 		printf("收到有效的LSU！来自%s\n", inet_ntoa(ip_temp));
 		handle_pwospf_lsu(packet, interface);
+		// report topology updated.
+		printf("@@@ UPDATED topology:\n");
+		print_topology_structs();
 	}
 
 
@@ -88,6 +91,31 @@ struct pwospf_router * get_router_with_rid(uint32_t rid)
 	return NULL;
 }
 
+struct pwospf_router * create_router_node(uint32_t rid)
+{
+	struct pwospf_router *routers = topology;
+	while(routers->next){
+		routers = routers->next;
+	}
+	routers->next = malloc(sizeof(struct pwospf_router));
+	routers->next->rid = rid;
+	routers->next->aid = AREA_ID_IN_THIS_PROJECT;
+	routers->next->lsuint = OSPF_DEFAULT_LSUINT;
+	routers->next->last_seq = 0;
+	return routers->next;
+}
+
+void free_ifs(struct pwospf_interface* head)
+{
+   struct pwospf_interface* tmp;
+   while (head != NULL)
+    {
+       tmp = head;
+       head = head->next;
+       free(tmp);
+    }
+}
+
 /*
  *----------------------------------------------------------------------
  *
@@ -111,21 +139,44 @@ void handle_pwospf_lsu(uint8_t * packet, char* interface)
 {
 	// We surely need to know which router sends this packet, identify this from OSPF header.
 	struct ospfv2_hdr *ospf_hdr = (struct ospfv2_hdr *) (packet + sizeof(struct sr_ethernet_hdr) + sizeof(struct ip));
+	struct ospfv2_lsu_hdr *lsu_hdr = (struct ospfv2_lsu_hdr *) (ospf_hdr + sizeof(struct ospfv2_hdr));
 	// need to loop through router list to find this one. 
 	struct pwospf_router *routers = topology;
 	// first check if the packet is from current router:
 	if(routers->rid == ospf_hdr->rid){
 		// the LSU is *FROM* us, drop
+		printf("the LSU is *FROM* us, drop\n");
 		return;
 	}
 
 	// then check the whole topology.
 	struct pwospf_router *result_router = get_router_with_rid(ospf_hdr->rid);
-	if(result_router != NULL){
-		// if we find exsiting router in the topology structure. 
+	if(result_router == NULL){
+		// if does not exist, we create one. 
+		result_router = create_router_node(ospf_hdr->rid);
 	}
-	else{
-		// this is a new router, we need to add it into the topology structure.
+	// if we find exsiting router in the topology structure. 
+	free_ifs(result_router->ifs);
+	// the first one: 
+	result_router->ifs = malloc(sizeof(struct pwospf_interface));
+	struct pwospf_interface *ifs = result_router->ifs;
+	struct ospfv2_lsu *lsu = (struct ospfv2_lsu *) (lsu_hdr + sizeof(struct ospfv2_lsu_hdr));
+	ifs->ip_addr = lsu->subnet;
+	ifs->mask = lsu->mask;
+	ifs->neighbor_rid = lsu->rid;
+	// now the rest of advertisements.
+
+	printf("!@%ld\n", ntohl(lsu_hdr->num_adv));
+	int i; // initially 1 for skipping one above.
+	for (i = 1; i < ntohl(lsu_hdr->num_adv); ++i)
+	{
+		printf("0\n");
+		ifs->next = malloc(sizeof(struct pwospf_interface));
+		ifs = ifs->next;
+		lsu += sizeof(struct ospfv2_lsu);
+		ifs->ip_addr = lsu->subnet;
+		ifs->mask = lsu->mask;
+		ifs->neighbor_rid = lsu->rid;
 	}
 
 }

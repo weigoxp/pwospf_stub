@@ -27,7 +27,7 @@ struct pwospf_router
 
 struct pwospf_interface
 {
-	char name[SR_IFACE_NAMELEN];
+	char name[SR_IFACE_NAMELEN]; // used only for self router
 	uint32_t ip_addr;
 	uint32_t mask;
 	uint16_t helloint; // interval in seconds between HELLO broadcasts

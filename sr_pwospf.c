@@ -327,7 +327,9 @@ void pwospf_send_hello(struct sr_instance* sr)
 
         // fill in lsu header
         struct ospfv2_lsu_hdr *lsu_hdr = packet + sizeof(struct sr_ethernet_hdr) + sizeof(struct ip) + sizeof(struct ospfv2_hdr);
+
         lsu_hdr->seq = topology->seq ;
+
         lsu_hdr->ttl = OSPF_MAX_LSU_TTL; // 255
         lsu_hdr->num_adv = htonl(3); //We hardcode it to 3 here. 
 
