@@ -32,7 +32,7 @@ void handle_pwospf_packet(	struct sr_instance* sr,
 		printf("收到有效的LSU！来自%s\n", inet_ntoa(ip_temp));
 		handle_pwospf_lsu(packet, interface);
 		// report topology updated.
-		printf("@@@ UPDATED topology:\n");
+		printf("!!! UPDATED topology:\n");
 		print_topology_structs();
 	}
 
