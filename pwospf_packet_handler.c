@@ -103,6 +103,8 @@ struct pwospf_router * create_router_node(uint32_t rid)
 	routers->next->aid = AREA_ID_IN_THIS_PROJECT;
 	routers->next->lsuint = OSPF_DEFAULT_LSUINT;
 	routers->next->last_seq = 0;
+	routers->next->ifs = NULL;
+	routers->next->next = NULL;
 	return routers->next;
 }
 
@@ -156,6 +158,7 @@ void handle_pwospf_lsu(uint8_t * packet, char* interface)
 		// if does not exist, we create one. 
 		result_router = create_router_node(ospf_hdr->rid);
 	}
+	
 	// if we find exsiting router in the topology structure. 
 	free_ifs(result_router->ifs);
 	// the first one: 
@@ -169,6 +172,7 @@ void handle_pwospf_lsu(uint8_t * packet, char* interface)
 	ifs->neighbor_rid = (lsu->rid);
 	ifs->neighbor_ip_addr = 0;
 	ifs->ts = 0;
+	ifs->next = NULL;
 	// now the rest of advertisements.
 
 	printf("!@%d\n", (lsu_hdr->num_adv));
@@ -186,6 +190,7 @@ void handle_pwospf_lsu(uint8_t * packet, char* interface)
 		ifs->neighbor_rid = (lsu->rid);
 		ifs->neighbor_ip_addr = 0;
 		ifs->ts = 0;
+		ifs->next = NULL;
 	}
 
 }

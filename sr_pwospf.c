@@ -349,7 +349,7 @@ void pwospf_send_hello(struct sr_instance* sr)
 
         // ----------
         struct ospfv2_lsu *t = packet + sizeof(struct sr_ethernet_hdr) + sizeof(struct ip) + sizeof(struct ospfv2_hdr) + sizeof(struct ospfv2_lsu_hdr) + sizeof(struct ospfv2_lsu);
-        struct in_addr tt = {.s_addr = t->subnet};
+        struct in_addr tt = {.s_addr = t->rid};
         printf("~~~~~~~~~%s\n", inet_ntoa(tt));
 
         // ----------
