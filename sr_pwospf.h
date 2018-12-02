@@ -10,6 +10,11 @@
 #ifndef SR_PWOSPF_H
 #define SR_PWOSPF_H
 
+#define false 0
+#define true 1
+typedef int bool; 
+
+
 #include <pthread.h>
 #include <stdio.h>
 #include <unistd.h>
@@ -45,5 +50,8 @@ void pwospf_send_hello(struct sr_instance* sr);
 
 void pwospf_send_LSU(struct sr_instance* sr);
 void print_topology_structs();
+bool check_Neighbour_TimeOut();
+
+
 
 #endif /* SR_PWOSPF_H */

@@ -18,6 +18,7 @@
 #include "pwospf_protocol.h"
 #include "sr_packethandler.h"
 #include "pwospf_packet_handler.h"
+#include <time.h>
 
 
 
@@ -26,7 +27,7 @@ static void* pwospf_run_thread(void* arg);
 
 // The topology structure, the first node in the list is current router by default. 
 struct pwospf_router *topology = NULL;
-
+int seq_counter = 0;
 /*---------------------------------------------------------------------
  * Method: pwospf_init(..)
  *
@@ -141,7 +142,7 @@ static
 void* pwospf_run_thread(void* arg)
 {
     struct sr_instance* sr = (struct sr_instance*)arg;
-    int LSU_count = 0;
+    int LSU_count = 25;
     while(1)
     {
         /* -- PWOSPF subsystem functionality should start  here! -- */
@@ -149,9 +150,11 @@ void* pwospf_run_thread(void* arg)
         pwospf_lock(sr->ospf_subsys);
 
         pwospf_send_hello(sr);
-       
-        if(LSU_count % 6 ==0)
+        
+
+        if(LSU_count % 6 ==0 || check_Neighbour_TimeOut())
             pwospf_send_LSU(sr); 
+
         LSU_count ++; 
         pwospf_unlock(sr->ospf_subsys);
         printf(" pwospf subsystem sleeping for 5 secs\n");
@@ -328,7 +331,8 @@ void pwospf_send_hello(struct sr_instance* sr)
         // fill in lsu header
         struct ospfv2_lsu_hdr *lsu_hdr = packet + sizeof(struct sr_ethernet_hdr) + sizeof(struct ip) + sizeof(struct ospfv2_hdr);
 
-        //lsu_hdr->seq = topology->seq ;
+        lsu_hdr->seq = seq_counter;
+        seq_counter++;
 
         lsu_hdr->ttl = OSPF_MAX_LSU_TTL; // 255
         lsu_hdr->num_adv = (3); //We hardcode it to 3 here. 
@@ -364,7 +368,8 @@ void pwospf_send_hello(struct sr_instance* sr)
     printf("已给所有neighbor发LSU。\n");
 }
 
-
+ /*----------------------------------------------------------------------
+ */
 
 void print_topology_structs()
 {
@@ -393,9 +398,13 @@ void print_topology_structs()
             printf("\tNeighbor RID: %s\n", inet_ntoa(ip_temp));
             ip_temp.s_addr = interface_p->neighbor_ip_addr;
             printf("\tNeighbor IP address: %s\n", inet_ntoa(ip_temp));
-            char *t = ctime(&(interface_p->ts));
-            printf("\tTime Stamp: %s\n", t);
+           // char *t = ctime(&(interface_p->ts));
+            printf("\tTime Stamp: %s\n", ctime(&(interface_p->ts)));
+
+            printf("\tLast Sequence Number:: %d\n", pointer->last_seq);
+            printf("\tTotol LSU sent: %d\n", seq_counter);
             interface_p = interface_p->next;
+
             printf("\t-------------------------------\n");
         }
         pointer = pointer->next;
@@ -405,8 +414,31 @@ void print_topology_structs()
 }
 
 
+ /*----------------------------------------------------------------------
+ */ // for hello only
+bool check_Neighbour_TimeOut(){
+    struct pwospf_interface *pwospf_ifs = topology->ifs;
+    // this router's neighbours
+    bool timeout = false;
+    while(pwospf_ifs){
+        int diff_t = (int) difftime(time(NULL), pwospf_ifs->ts);
 
+        if(diff_t > OSPF_NEIGHBOR_TIMEOUT){
+            pwospf_ifs->neighbor_rid = 0;
+            pwospf_ifs->neighbor_ip_addr = 0;
+            timeout= true;
+        }
 
+        pwospf_ifs= pwospf_ifs->next;
+    }
 
+    return timeout;
+}
 
+ /*----------------------------------------------------------------------
+ */
+
+bool check_topo_entry_TimeOut(){
+
+}
 
