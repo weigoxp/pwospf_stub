@@ -20,7 +20,7 @@ struct pwospf_router
 	uint32_t rid; // by convention, it's the IP addr of 0th interface 
 	uint32_t aid;
 	uint16_t lsuint; // interval in seconds between link state update broadcasts.
-	int last_seq;  // the sequence number of the last recieved LSU packets. 
+	uint32_t last_seq;  // the sequence number of the last recieved LSU packets. 
 	struct pwospf_interface *ifs; // list of current router interfaces
 	struct pwospf_router *next;
 };

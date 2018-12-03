@@ -77,6 +77,8 @@ void handle_pwospf_hello(uint8_t * packet, char* interface)
 	}
 	printf("Unrecognized interface %s\n", interface);
 }
+//----------------------------------------------------------------------
+
 
 struct pwospf_router * get_router_with_rid(uint32_t rid)
 {
@@ -91,6 +93,8 @@ struct pwospf_router * get_router_with_rid(uint32_t rid)
 	}
 	return NULL;
 }
+
+//----------------------------------------------------------------------
 
 struct pwospf_router * create_router_node(uint32_t rid)
 {
@@ -107,7 +111,7 @@ struct pwospf_router * create_router_node(uint32_t rid)
 	routers->next->next = NULL;
 	return routers->next;
 }
-
+//----------------------------------------------------------------------
 void free_ifs(struct pwospf_interface* head)
 {
    struct pwospf_interface* tmp;
@@ -151,14 +155,24 @@ void handle_pwospf_lsu(uint8_t * packet, char* interface)
 		printf("the LSU is *FROM* us, drop\n");
 		return;
 	}
-
 	// then check the whole topology.
 	struct pwospf_router *result_router = get_router_with_rid(ospf_hdr->rid);
-	if(result_router == NULL){
+
+	if(result_router != NULL){
+			// check if the lsu packet's seq is newer. if not drop.
+		if(lsu_hdr->seq <= result_router->last_seq){
+			printf("the LSU is too old, drop\n");
+			return;
+		}
+	}
+
+	else{
 		// if does not exist, we create one. 
 		result_router = create_router_node(ospf_hdr->rid);
+
 	}
-	
+
+	result_router->last_seq = lsu_hdr->seq;
 	// if we find exsiting router in the topology structure. 
 	free_ifs(result_router->ifs);
 	// the first one: 
