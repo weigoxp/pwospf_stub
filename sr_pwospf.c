@@ -333,6 +333,7 @@ void pwospf_send_hello(struct sr_instance* sr)
 
         lsu_hdr->seq = seq_counter;
         seq_counter++;
+        printf("\tTotol LSU sent: %d\n", seq_counter);
 
         lsu_hdr->ttl = OSPF_MAX_LSU_TTL; // 255
         lsu_hdr->num_adv = (3); //We hardcode it to 3 here. 
@@ -383,6 +384,7 @@ void print_topology_structs()
         printf("\tRouter ID: %s\n", inet_ntoa(ip_temp));
         printf("\tArea ID: %d\n", pointer->aid);
         printf("\tLSU int: %d\n", pointer->lsuint);
+        printf("\tLast Sequence Number:: %d\n", pointer->last_seq);
         
         struct pwospf_interface *interface_p = pointer->ifs;
         while(interface_p)
@@ -400,9 +402,6 @@ void print_topology_structs()
             printf("\tNeighbor IP address: %s\n", inet_ntoa(ip_temp));
            // char *t = ctime(&(interface_p->ts));
             printf("\tTime Stamp: %s\n", ctime(&(interface_p->ts)));
-
-            printf("\tLast Sequence Number:: %d\n", pointer->last_seq);
-            printf("\tTotol LSU sent: %d\n", seq_counter);
             interface_p = interface_p->next;
 
             printf("\t-------------------------------\n");
