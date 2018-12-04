@@ -13,6 +13,7 @@
 #include "sr_if.h"
 #include "sr_packethandler.h"
 #include "sr_pwospf.h"
+#include "sr_rt.h"
 
 
 struct pwospf_router
@@ -37,12 +38,25 @@ struct pwospf_interface
 	struct pwospf_interface *next;
 };
 
+struct q_node
+{
+	uint32_t rid;
+	uint32_t nexthop;
+	char interface[SR_IFACE_NAMELEN];
+	struct q_node *next;
+};
+
 void handle_pwospf_packet(	struct sr_instance* sr,
 							uint8_t * packet/* lent */,
 							unsigned int len,
                 			char* interface);
 
+
+void update_routing_table(struct sr_instance* sr);
 void handle_pwospf_hello(uint8_t * packet, char* interface);
+struct pwospf_router * get_router_with_rid(uint32_t rid);
+void forward_lsu(struct sr_instance* sr, uint8_t * packet,unsigned int len, char* interface);
 void handle_pwospf_lsu(uint8_t * packet, char* interface);
+
 
 #endif

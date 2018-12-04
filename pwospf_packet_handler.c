@@ -1,5 +1,6 @@
 #include "pwospf_packet_handler.h"
 
+struct q_node *q = NULL;
 
 void handle_pwospf_packet(	struct sr_instance* sr,
 							uint8_t * packet/* lent */,
@@ -34,9 +35,233 @@ void handle_pwospf_packet(	struct sr_instance* sr,
 		// report topology updated.
 		printf("!!! UPDATED topology:\n");
 		print_topology_structs();
+		update_routing_table(sr);
+		printf("!?! UPDATED routing table\n");
+		sr_print_routing_table(sr);
+
+		// forward the LSU to all interfaces except the one it came from.
+		// forward_lsu(sr, packet, len, interface);
+
 	}
 
 
+}
+
+void enqueue(uint32_t rid, uint32_t nexthop, char *interface)
+{
+	struct q_node *newNode = malloc(sizeof(struct q_node));
+	newNode->rid = rid;
+	newNode->nexthop = nexthop;
+	strcpy(newNode->interface, interface);
+	newNode->next = NULL;
+	if(q == NULL)
+		q = newNode;
+	else{
+		struct q_node *ptr = q;
+		while(ptr->next)
+			ptr = ptr->next;
+		// now ptr->next is null
+		ptr->next = newNode;
+	}
+}
+
+void dequeue(struct q_node* result){
+	struct q_node *first = NULL;
+	first = q;
+	q = q->next;
+	memcpy(result, first, sizeof(struct q_node));
+	free(first);
+}
+
+void free_q()
+{
+   struct q_node* tmp;
+   while (q != NULL)
+    {
+       tmp = q;
+       q = q->next;
+       free(tmp);
+    }
+}
+
+
+void set_default_route(struct sr_instance* sr)
+{
+	// if we are not vhost1, then need to set default route
+	if(vhost1 != 1){
+		struct pwospf_interface *ifs = topology->ifs;
+		while(ifs){
+			if(ifs->neighbor_ip_addr != 0 && ifs->neighbor_ip_addr != -1){
+				struct sr_rt *newNode = malloc(sizeof(struct sr_rt));
+				newNode->dest.s_addr = 0;
+				newNode->gw.s_addr = ifs->neighbor_ip_addr;
+				newNode->mask.s_addr = 0;
+				strcpy(newNode->interface, ifs->name);
+				newNode->next = NULL;
+				sr->routing_table = newNode;
+				break;
+			}
+			ifs = ifs->next;
+		}
+	}
+}
+
+void empty_rt(struct sr_instance *sr)
+{
+	// struct sr_rt *rt = sr->routing_table;
+	// struct sr_rt *tmp;
+	// if(vhost1 == 1){
+	// 	rt = rt->next;
+	// }
+	// while(rt){
+	// 	tmp = rt;
+	// 	rt = rt->next;
+	// 	free(tmp);
+	// }
+	if(vhost1 == 1){
+		sr->routing_table->next = NULL;
+	}
+	else{
+		sr->routing_table = NULL;
+	}
+}
+
+void print_q(){
+	if(q == NULL){
+		printf("Queue is empty.\n");
+		return;
+	}
+	printf("QUEUE: \n");
+	struct q_node *ptr;
+	ptr = q;
+	while(ptr){
+		struct in_addr ip_temp = {.s_addr = ptr->rid};
+		struct in_addr ip_temp2 = {.s_addr = ptr->nexthop};
+		printf("%s ", inet_ntoa(ip_temp));
+		printf("%s %s\n", inet_ntoa(ip_temp2), ptr->interface);
+		ptr = ptr->next;
+	}
+}
+
+
+/*
+ *----------------------------------------------------------------------
+ *
+ * update_routing_table --
+ *
+ *  This function is called after we get LSU.
+ *
+ * Parameters:
+ *      
+ *  
+ * Return: None.
+ *
+ *----------------------------------------------------------------------
+ */
+void update_routing_table(struct sr_instance* sr)
+{
+	int index = 0;	// for adding to THE array
+	uint32_t added_rid[3]; 	// this array is for the recording of routers been added to the queue
+	// printf("Routing table before FREE\n");
+	// sr_print_routing_table(sr);
+	empty_rt(sr);
+	// printf("Routing table after FREE\n");
+	// sr_print_routing_table(sr);
+	set_default_route(sr);
+	struct pwospf_interface *my_ifs = topology->ifs;
+	// skip the first if exist. e.g. vhost1
+	if(vhost1 == 1){
+		my_ifs = my_ifs->next;
+	}
+
+	added_rid[index] = topology->rid;	// add my rid to the array.
+	index++;
+	// this loop go through current router's multiple interfaces.
+	// finds the way out, need to store the next hop and interface name for iterating along the path.
+	while(my_ifs){
+		// if the connection is lost, skip. Here check for the FFF address. 
+		if(my_ifs->neighbor_rid == -1){
+			my_ifs = my_ifs->next;
+			continue;
+		}
+		// create new rt node:
+		struct sr_rt *new_rt = malloc(sizeof(struct sr_rt));
+		new_rt->dest.s_addr = my_ifs->ip_addr;
+		new_rt->gw.s_addr = my_ifs->neighbor_ip_addr;
+		new_rt->mask.s_addr = my_ifs->mask;
+		strcpy(new_rt->interface, my_ifs->name);
+		new_rt->next = NULL;
+		// ⬆
+		// add the node to rt. 
+		struct sr_rt *ptr = NULL;
+		ptr = sr->routing_table;
+		while(ptr->next)
+			ptr = ptr->next;
+		ptr->next = new_rt;
+		// ⬆
+		if(my_ifs->neighbor_rid != -1 && my_ifs->neighbor_rid != 0){
+			enqueue(my_ifs->neighbor_rid, my_ifs->neighbor_ip_addr, my_ifs->name);
+			added_rid[index] = my_ifs->neighbor_rid;
+			index++;
+		}
+		my_ifs = my_ifs->next;
+	}
+	// now the subnets directly connected to me have been checked. 
+	print_q();
+	while(q){
+		struct q_node *current = malloc(sizeof(struct q_node));
+		dequeue(current);
+		printf("After DEQUEUE: \n");
+		print_q();
+		struct pwospf_router *router = NULL;
+		router = get_router_with_rid(current->rid);
+		// in the process of convergence, a router could have 2 topology node. 
+		if(router == NULL){
+			continue;
+		}
+		struct pwospf_interface *ifs = router->ifs;
+		// iterate the interface list in the current router from queue
+		while(ifs){
+			// if the connection is lost, skip. Here check for the FFF address. 
+			if(ifs->neighbor_rid == -1){
+				ifs = ifs->next;
+				continue;
+			}
+			struct sr_rt *newNode = malloc(sizeof(struct sr_rt));
+			newNode->dest.s_addr = ifs->ip_addr;
+			newNode->gw.s_addr = current->nexthop;
+			newNode->mask.s_addr = ifs->mask;
+			strcpy(newNode->interface, current->interface);
+			newNode->next = NULL;
+			// now add the node to rt
+			struct sr_rt *ptrr = NULL;
+			ptrr = sr->routing_table;
+			while(ptrr->next)
+				ptrr = ptrr->next;
+			ptrr->next = newNode;
+			// 对于每一个已连接的interface来说，不在array里的有效RID要加入queue
+			if(ifs->neighbor_rid != 0){
+				int i = 0;
+				int flag = 1; // 0 means already exist no need to add, 1 means do not exist. 
+				// iterate through the array
+				for (i = 0; i < 3; ++i){
+					if(added_rid[i] == ifs->neighbor_rid){
+						flag = 0;
+						break;
+					}
+				}
+				// here, if we have not ever see the matched RID, then add. 
+				if(flag == 1){
+					enqueue(ifs->neighbor_rid, current->nexthop, current->interface);
+					added_rid[index] = ifs->neighbor_rid;
+					index++;
+				}
+			}
+			ifs = ifs->next;
+		}
+		free(current);
+	}
+	free_q();
 }
 
 /*
@@ -121,6 +346,23 @@ void free_ifs(struct pwospf_interface* head)
        head = head->next;
        free(tmp);
     }
+}
+
+void forward_lsu(struct sr_instance* sr, uint8_t * packet,unsigned int len, char* interface)
+{
+	struct sr_ethernet_hdr *e_hdr = (struct sr_ethernet_hdr *) packet;
+	struct sr_if *ifs = sr->if_list;
+	while(ifs){
+		// dont forward the packet to where it came from.
+		if(strcmp(interface, ifs->name) == 0){
+			ifs = ifs->next;
+			continue;
+		}
+		memcpy(e_hdr->ether_shost, ifs->addr, ETHER_ADDR_LEN);
+		sr_send_packet(sr, packet,len,ifs->name);
+		ifs = ifs->next;
+	}
+	printf("已转发LSU\n");
 }
 
 /*

@@ -42,6 +42,7 @@ struct pwospf_subsys
 };
 
 extern struct pwospf_router *topology;
+extern int vhost1;
 
 int pwospf_init(struct sr_instance* sr);
 void pwospf_build_ospf_hdr(struct ospfv2_hdr *ptr, struct sr_instance* sr, uint8_t OSPF_TYPE);

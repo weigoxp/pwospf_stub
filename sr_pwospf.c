@@ -27,6 +27,7 @@ static void* pwospf_run_thread(void* arg);
 
 // The topology structure, the first node in the list is current router by default. 
 struct pwospf_router *topology = NULL;
+int vhost1 = 0;
 int seq_counter = 0;
 /*---------------------------------------------------------------------
  * Method: pwospf_init(..)
@@ -54,6 +55,7 @@ int pwospf_init(struct sr_instance* sr)
     topology->rid = sr->if_list->ip;
     topology->aid = AREA_ID_IN_THIS_PROJECT;
     topology->lsuint = OSPF_DEFAULT_LSUINT;
+    topology->last_seq = 0;
 
 
     topology->ifs = (struct pwospf_interface *) malloc(sizeof(struct pwospf_interface));
@@ -88,6 +90,9 @@ int pwospf_init(struct sr_instance* sr)
         topology_ifs = topology_ifs->next;
         interfaces = interfaces->next;
     }
+    // determine value of variable vhost1
+    if(sr->routing_table != NULL)
+        vhost1 = 1;
     // ------------- initialization of topology structs -------------⬆
 
     // TESTING initial topology structures. 
@@ -284,6 +289,17 @@ void pwospf_send_hello(struct sr_instance* sr)
  *----------------------------------------------------------------------
  */
 
+int get_n_reachable_routes()
+{
+    int n = 0;
+    struct pwospf_interface *ifs = topology->ifs;
+    while(ifs){
+        if(ifs->neighbor_rid != -1)
+            n++;
+        ifs = ifs->next;
+    }
+    return n;
+}
 
 
  void pwospf_send_LSU(struct sr_instance* sr )
@@ -293,11 +309,12 @@ void pwospf_send_hello(struct sr_instance* sr)
     while(interfaces)
     {
 
+        int n_lsu = get_n_reachable_routes();
         // the packet include a Ethernet header, IP header, OSPF header and OSPF LSU header.
         void *packet = malloc(sizeof(struct sr_ethernet_hdr) + 
                                 sizeof(struct ip) + sizeof(struct ospfv2_hdr) + 
                                 sizeof(struct ospfv2_lsu_hdr)+
-                                3*sizeof(struct ospfv2_lsu));
+                                n_lsu*sizeof(struct ospfv2_lsu));
 
         // Ethernet header filling is done inside the function below: 
         struct sr_ethernet_hdr *e_hdr = (struct sr_ethernet_hdr *) packet;
@@ -336,14 +353,18 @@ void pwospf_send_hello(struct sr_instance* sr)
         printf("\tTotol LSU sent: %d\n", seq_counter);
 
         lsu_hdr->ttl = OSPF_MAX_LSU_TTL; // 255
-        lsu_hdr->num_adv = (3); //We hardcode it to 3 here. 
+        lsu_hdr->num_adv = n_lsu; //We hardcode it to 3 here. 
 
         // fill in lsu advertisement
-        int i =0;
+        int i = 0;
         //topology->ifs  first router, which is 
         struct pwospf_interface *pwospf_ifs = topology->ifs;
 
         while(pwospf_ifs){
+            if(pwospf_ifs->neighbor_rid == -1){
+                pwospf_ifs= pwospf_ifs->next;
+                continue;
+            }
             struct ospfv2_lsu *lsu = (struct ospfv2_lsu *) (packet + sizeof(struct sr_ethernet_hdr) + sizeof(struct ip) + sizeof(struct ospfv2_hdr) + sizeof(struct ospfv2_lsu_hdr) + i * sizeof(struct ospfv2_lsu));
             lsu ->subnet = pwospf_ifs->ip_addr;
             lsu -> mask = pwospf_ifs->mask;
@@ -420,12 +441,17 @@ bool check_Neighbour_TimeOut(){
     // this router's neighbours
     bool timeout = false;
     while(pwospf_ifs){
+        // if the interface is connected to a server or gateway, ignore the checking of timestamp.
+        if(pwospf_ifs->neighbor_rid == 0){
+            pwospf_ifs= pwospf_ifs->next;
+            continue;
+        }
         int diff_t = (int) difftime(time(NULL), pwospf_ifs->ts);
 
         if(diff_t > OSPF_NEIGHBOR_TIMEOUT){
-            pwospf_ifs->neighbor_rid = 0;
-            pwospf_ifs->neighbor_ip_addr = 0;
-            timeout= true;
+            pwospf_ifs->neighbor_rid = -1;
+            pwospf_ifs->neighbor_ip_addr = -1;
+            timeout = true;
         }
 
         pwospf_ifs= pwospf_ifs->next;
