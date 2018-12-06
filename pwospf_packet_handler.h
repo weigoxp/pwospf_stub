@@ -56,7 +56,7 @@ void update_routing_table(struct sr_instance* sr);
 void handle_pwospf_hello(uint8_t * packet, char* interface);
 struct pwospf_router * get_router_with_rid(uint32_t rid);
 void forward_lsu(struct sr_instance* sr, uint8_t * packet,unsigned int len, char* interface);
-void handle_pwospf_lsu(uint8_t * packet, char* interface);
+void handle_pwospf_lsu(uint8_t * packet, char* interface,struct sr_instance* sr, unsigned int len);
 
 
 #endif

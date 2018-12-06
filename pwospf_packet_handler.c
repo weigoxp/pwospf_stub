@@ -31,16 +31,7 @@ void handle_pwospf_packet(	struct sr_instance* sr,
 	if (ospf_hdr->type == OSPF_TYPE_LSU)
 	{
 		printf("收到有效的LSU！来自%s\n", inet_ntoa(ip_temp));
-		handle_pwospf_lsu(packet, interface);
-		// report topology updated.
-		printf("!!! UPDATED topology:\n");
-		print_topology_structs();
-		update_routing_table(sr);
-		printf("!?! UPDATED routing table\n");
-		sr_print_routing_table(sr);
-
-		// forward the LSU to all interfaces except the one it came from.
-		// forward_lsu(sr, packet, len, interface);
+		handle_pwospf_lsu(packet, interface,sr,len);
 
 	}
 
@@ -180,23 +171,31 @@ void update_routing_table(struct sr_instance* sr)
 	// finds the way out, need to store the next hop and interface name for iterating along the path.
 	while(my_ifs){
 		// if the connection is lost, skip. Here check for the FFF address. 
-		if(my_ifs->neighbor_rid == -1){
-			my_ifs = my_ifs->next;
-			continue;
-		}
 		// create new rt node:
 		struct sr_rt *new_rt = malloc(sizeof(struct sr_rt));
 		new_rt->dest.s_addr = my_ifs->ip_addr;
-		new_rt->gw.s_addr = my_ifs->neighbor_ip_addr;
-		new_rt->mask.s_addr = my_ifs->mask;
 		strcpy(new_rt->interface, my_ifs->name);
 		new_rt->next = NULL;
+		//if broken router, set mask to 255 so dont deliver to subnet
+		// and set nexthop to self
+		if(my_ifs->neighbor_rid == -1){
+			new_rt->gw.s_addr = 0;
+			new_rt->mask.s_addr = 0xFFFFFFFF;
+		}
+		else { // server or connected router
+
+			new_rt->gw.s_addr = my_ifs->neighbor_ip_addr;
+			new_rt->mask.s_addr = my_ifs->mask;
+		}
+
 		// ⬆
 		// add the node to rt. 
 		struct sr_rt *ptr = NULL;
 		ptr = sr->routing_table;
+
 		while(ptr->next)
 			ptr = ptr->next;
+
 		ptr->next = new_rt;
 		// ⬆
 		if(my_ifs->neighbor_rid != -1 && my_ifs->neighbor_rid != 0){
@@ -222,15 +221,16 @@ void update_routing_table(struct sr_instance* sr)
 		struct pwospf_interface *ifs = router->ifs;
 		// iterate the interface list in the current router from queue
 		while(ifs){
-			// if the connection is lost, skip. Here check for the FFF address. 
-			if(ifs->neighbor_rid == -1){
-				ifs = ifs->next;
-				continue;
-			}
+
 			struct sr_rt *newNode = malloc(sizeof(struct sr_rt));
 			newNode->dest.s_addr = ifs->ip_addr;
 			newNode->gw.s_addr = current->nexthop;
-			newNode->mask.s_addr = ifs->mask;
+			if(ifs->neighbor_rid == -1)
+				newNode->mask.s_addr = 0xFFFFFFFF;
+			
+			else
+				newNode->mask.s_addr = ifs->mask;	
+			
 			strcpy(newNode->interface, current->interface);
 			newNode->next = NULL;
 			// now add the node to rt
@@ -240,7 +240,7 @@ void update_routing_table(struct sr_instance* sr)
 				ptrr = ptrr->next;
 			ptrr->next = newNode;
 			// 对于每一个已连接的interface来说，不在array里的有效RID要加入queue
-			if(ifs->neighbor_rid != 0){
+			if(ifs->neighbor_rid != 0 && ifs->neighbor_rid != -1){
 				int i = 0;
 				int flag = 1; // 0 means already exist no need to add, 1 means do not exist. 
 				// iterate through the array
@@ -353,16 +353,29 @@ void forward_lsu(struct sr_instance* sr, uint8_t * packet,unsigned int len, char
 	struct sr_ethernet_hdr *e_hdr = (struct sr_ethernet_hdr *) packet;
 	struct sr_if *ifs = sr->if_list;
 	while(ifs){
-		// dont forward the packet to where it came from.
-		if(strcmp(interface, ifs->name) == 0){
+		int flag=1;
+		struct pwospf_interface *curifs = topology->ifs;
+		while(curifs){
+			//find cur ether if in topo if.
+			if(strcmp(curifs->name, ifs->name)==0){
+				if(curifs->neighbor_rid ==0 ||curifs->neighbor_rid ==-1)
+					flag =0;
+			}
+			curifs=curifs->next;
+		}
+
+		// dont forward the packet to where it came from. or broke router or server
+		if(strcmp(interface, ifs->name) == 0 || flag==0){
 			ifs = ifs->next;
 			continue;
 		}
 		memcpy(e_hdr->ether_shost, ifs->addr, ETHER_ADDR_LEN);
 		sr_send_packet(sr, packet,len,ifs->name);
+		printf("已转发LSU\n");
 		ifs = ifs->next;
 	}
-	printf("已转发LSU\n");
+
+
 }
 
 /*
@@ -384,7 +397,7 @@ void forward_lsu(struct sr_instance* sr, uint8_t * packet,unsigned int len, char
  *
  *----------------------------------------------------------------------
  */
-void handle_pwospf_lsu(uint8_t * packet, char* interface)
+void handle_pwospf_lsu(uint8_t * packet, char* interface, struct sr_instance* sr,unsigned int len)
 {
 	// We surely need to know which router sends this packet, identify this from OSPF header.
 	struct ospfv2_hdr *ospf_hdr = (struct ospfv2_hdr *) (packet + sizeof(struct sr_ethernet_hdr) + sizeof(struct ip));
@@ -413,6 +426,8 @@ void handle_pwospf_lsu(uint8_t * packet, char* interface)
 		result_router = create_router_node(ospf_hdr->rid);
 
 	}
+
+
 
 	result_router->last_seq = lsu_hdr->seq;
 	// if we find exsiting router in the topology structure. 
@@ -448,6 +463,17 @@ void handle_pwospf_lsu(uint8_t * packet, char* interface)
 		ifs->ts = 0;
 		ifs->next = NULL;
 	}
+		
+
+		// report topology updated.
+	printf("!!! UPDATED topology:\n");
+	print_topology_structs();
+	update_routing_table(sr);
+	printf("!?! UPDATED routing table\n");
+	sr_print_routing_table(sr);
+
+	// forward the LSU to all interfaces except the one it came from.
+	forward_lsu(sr, packet, len, interface);
 
 }
 

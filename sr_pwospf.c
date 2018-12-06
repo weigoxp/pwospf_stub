@@ -309,12 +309,12 @@ int get_n_reachable_routes()
     while(interfaces)
     {
 
-        int n_lsu = get_n_reachable_routes();
+        int n_lsu = 3;
         // the packet include a Ethernet header, IP header, OSPF header and OSPF LSU header.
         void *packet = malloc(sizeof(struct sr_ethernet_hdr) + 
                                 sizeof(struct ip) + sizeof(struct ospfv2_hdr) + 
                                 sizeof(struct ospfv2_lsu_hdr)+
-                                n_lsu*sizeof(struct ospfv2_lsu));
+                                3*sizeof(struct ospfv2_lsu));
 
         // Ethernet header filling is done inside the function below: 
         struct sr_ethernet_hdr *e_hdr = (struct sr_ethernet_hdr *) packet;
@@ -361,10 +361,6 @@ int get_n_reachable_routes()
         struct pwospf_interface *pwospf_ifs = topology->ifs;
 
         while(pwospf_ifs){
-            if(pwospf_ifs->neighbor_rid == -1){
-                pwospf_ifs= pwospf_ifs->next;
-                continue;
-            }
             struct ospfv2_lsu *lsu = (struct ospfv2_lsu *) (packet + sizeof(struct sr_ethernet_hdr) + sizeof(struct ip) + sizeof(struct ospfv2_hdr) + sizeof(struct ospfv2_lsu_hdr) + i * sizeof(struct ospfv2_lsu));
             lsu ->subnet = pwospf_ifs->ip_addr;
             lsu -> mask = pwospf_ifs->mask;
