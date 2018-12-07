@@ -40,18 +40,6 @@ void sr_init(struct sr_instance* sr)
     /* Add initialization code here! */
 
  /* -- sr_init -- */
-    
-
-    for(int i=0;i<10;i++){
-        ipbuffer[i] = (struct ipunit*) malloc(sizeof(struct ipunit));
-
-        ipbuffer[i]-> counter =0;
-        ipbuffer[i]->sender_ip =0;
-        for(int j=0;j<300;j++){
-            ipbuffer[i]-> packet[j] =NULL;
-            ipbuffer[i]->packetLen[j] =0;   
-        }
-    }    
 
 }
 

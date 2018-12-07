@@ -11,6 +11,8 @@
 #include "arp_cache.h"
 #include "pwospf_packet_handler.h"
 
+struct buffer_node *buffer = NULL;
+
 void send_icmp_echo_reply(  struct sr_instance* sr, 
                             uint8_t * packet, 
                             unsigned int len, 
@@ -39,6 +41,56 @@ void send_icmp_echo_reply(  struct sr_instance* sr,
     printf("Sending back echo reply through %s\n", interface);
     sr_send_packet(sr,packet,len,interface);
 
+}
+
+void buffer_append(uint8_t * packet, unsigned int len, uint32_t nexthop)
+{
+    struct buffer_node *newNode = malloc(sizeof(struct buffer_node));
+    newNode->packet = malloc(len);
+    memcpy(newNode->packet, packet, len);
+    newNode->len = len;
+    newNode->nexthop = nexthop;
+    newNode->next = NULL;
+    if(buffer == NULL){
+        buffer = newNode;
+    }
+    else{
+        struct buffer_node *ptr = buffer;
+        while(ptr->next)
+            ptr = ptr->next;
+        ptr->next = newNode;
+    }
+}
+
+void buffer_send_packets(struct sr_instance* sr, unsigned char *dha, uint32_t nexthop, char* interface)
+{
+    unsigned char addr[6];
+    struct sr_if *ifs = sr->if_list;
+    while(ifs){
+        if(strcmp(ifs->name, interface) == 0){
+            memcpy(addr, ifs->addr, 6);
+            break;
+        }
+        ifs = ifs->next;
+    }
+    struct buffer_node *ptr = buffer;
+    while(ptr){
+        if(ptr->nexthop == nexthop){
+            struct sr_ethernet_hdr *e_hdr = (struct sr_ethernet_hdr *) ptr->packet;
+            memcpy(e_hdr->ether_shost, addr, ETHER_ADDR_LEN);
+            memcpy(e_hdr->ether_dhost, dha, ETHER_ADDR_LEN);
+            sr_send_packet(sr, ptr->packet, ptr->len, interface);
+
+            struct buffer_node *tmp = ptr;
+            ptr = ptr->next;
+            buffer = ptr;
+            free(tmp->packet);
+            free(tmp);
+        }
+        else{
+            ptr = ptr->next;
+        }
+    }
 }
 
 void handleIp(  struct ip* iphdr,
@@ -99,11 +151,11 @@ void handleIp(  struct ip* iphdr,
         iphdr->ip_sum = htons(chksum);
     }
     //look up routing table/ find ip of next hop
-    uint32_t nexhop = sr_getInterfaceAndNexthop(sr, iphdr->ip_dst.s_addr, interface);
+    uint32_t nexthop = sr_getInterfaceAndNexthop(sr, iphdr->ip_dst.s_addr, interface);
     // interface here already got updated
 
     // see if nexthop's mac address is in arpcache
-    unsigned char* ether_dhost = arp_cache_get_ethernet_addr(nexhop);
+    unsigned char* ether_dhost = arp_cache_get_ethernet_addr(nexthop);
 
 
     // the source address need to be corrosponding to the interface.
@@ -125,21 +177,11 @@ void handleIp(  struct ip* iphdr,
     // send arp request
     else 
     {
-        sendArpRequest(sr,nexhop,interface);
+        sendArpRequest(sr,nexthop,interface);
 
         //save ip packet pointer to ip buffer
-
-        for(int i=0;i<10;i++){
-            //find ipbuffer unit for this ip address
-            if(ipbuffer[i]->sender_ip==0){
-                ipbuffer[i]->sender_ip=iphdr->ip_dst.s_addr;
-                ipbuffer[i]->counter ++;
-                ipbuffer[i]->packet[ipbuffer[i]->counter] = packet;
-                ipbuffer[i]->packetLen[ipbuffer[i]->counter] = len;
-                break;
-            }
-
-        }
+        buffer_append(packet, len, nexthop);
+        
 
 
     }
@@ -208,30 +250,7 @@ void handleArp( struct sr_arphdr *arphdr,
         if(MAC ==NULL)
             arp_cache_add_mapping(arphdr->ar_sha,arphdr->ar_sip);
 
-
-        // search ip buffer for arphdr->ar_sip
-        for(int i=0;i<10;i++){
-            //find ipbuffer unit for this ip address
-            if(ipbuffer[i]->sender_ip==arphdr->ar_sip){
-
-                for(int j=0;j<ipbuffer[i]->counter;j++){
-                    if(! ipbuffer[i]->packet[j]){
-                        continue;
-                    }
-                    int packetLen = ipbuffer[i]->packetLen[j];
-                    struct sr_ethernet_hdr *ether_p = (struct sr_ethernet_hdr *)ipbuffer[i]->packet[j];
-                    memcpy(ether_p->ether_dhost, arphdr->ar_sha, 6);
-                    sr_send_packet(sr,ipbuffer[i]->packet[j],packetLen,interface);
-
-                    ipbuffer[i]->packetLen[j] =0;
-                    ipbuffer[i]->packet[j] =NULL;
-                }
-                ipbuffer[i]->counter =0;
-                ipbuffer[i]->sender_ip=0;
-            }
-        }
-//
-
+        buffer_send_packets(sr, arphdr->ar_sha, arphdr->ar_sip, interface);
     }
 
  

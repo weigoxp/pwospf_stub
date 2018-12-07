@@ -456,10 +456,5 @@ bool check_Neighbour_TimeOut(){
     return timeout;
 }
 
- /*----------------------------------------------------------------------
- */
 
-bool check_topo_entry_TimeOut(){
-
-}
 

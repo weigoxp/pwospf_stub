@@ -5,19 +5,13 @@
 #define PWOSPF_IP_PROTOCOL 89
 #endif
 
-struct ipunit
-{	
-	// pointer to IP packet
-
-	uint8_t  *packet [300];
-	int packetLen [300];
-	// dst ip address that used to idetify different IP packet.
-	uint32_t sender_ip;
-
-	int counter;
-
+struct buffer_node
+{
+    uint8_t * packet;
+    unsigned int len;
+    uint32_t nexthop;
+    struct buffer_node *next;
 };
-struct ipunit* ipbuffer[10];
 
 struct sr_icmp_hdr
 {
